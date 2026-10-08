@@ -1,0 +1,25 @@
+# Render Blueprint: deploys the lvirify hub as a free web service.
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: lvirify
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:hub
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.0
+      - key: HUB_NAME
+        value: Office
+      - key: HUB_SECRET
+        generateValue: true
+      - key: SPOTIFY_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
+        sync: false
+      # PUBLIC_URL is taken from RENDER_EXTERNAL_URL automatically.
+      # KEEPALIVE defaults to on when running on Render.

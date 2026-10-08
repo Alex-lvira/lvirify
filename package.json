@@ -1,0 +1,29 @@
+{
+  "name": "lvirify",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Office now-playing cassette wall: hub (Raspberry Pi) + per-colleague companion that broadcasts Spotify to the wall and to Slack status.",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.10"
+  },
+  "scripts": {
+    "build": "npm run build -w packages/shared && npm run build -w packages/clients && npm run build -w packages/dashboard && npm run build -w packages/hub && npm run build -w packages/companion",
+    "build:shared": "npm run build -w packages/shared && npm run build -w packages/clients",
+    "dev:hub": "npm run build:shared && npm run dev -w packages/hub",
+    "dev:dashboard": "npm run build:shared && npm run dev -w packages/dashboard",
+    "dev:companion": "npm run build:shared && npm run dev -w packages/companion --",
+    "start:hub": "npm run start -w packages/hub",
+    "start:companion": "npm run start -w packages/companion --",
+    "typecheck": "npm run build:shared && tsc -p packages/hub --noEmit && tsc -p packages/companion --noEmit && tsc -p packages/dashboard --noEmit",
+    "demo": "node scripts/demo.mjs",
+    "companion": "node packages/companion/dist/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "ws": "^8.18.0"
+  }
+}

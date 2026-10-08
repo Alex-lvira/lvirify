@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>lvirify</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header id="header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <h1><span id="hub-name">Office</span> <span class="brand-sub">now playing</span></h1>
+      </div>
+      <div class="meta">
+        <span id="count"></span>
+        <a class="kiosk-link join-link" href="/join" title="Add yourself to the wall">join</a>
+        <a class="kiosk-link" href="/kiosk" title="Full-screen wall">kiosk</a>
+      </div>
+    </header>
+    <main id="wall" class="wall"></main>
+    <div id="conn" class="conn" hidden>reconnecting…</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

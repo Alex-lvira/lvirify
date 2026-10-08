@@ -1,0 +1,30 @@
+# systemd unit for the lvirify hub on the office Raspberry Pi.
+#
+#   sudo cp deploy/lvirify-hub.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now lvirify-hub
+#   journalctl -u lvirify-hub -f
+#
+# Adjust User/WorkingDirectory/ExecStart to where you cloned the repo.
+[Unit]
+Description=lvirify hub (office now-playing cassette wall)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/lvirify/packages/hub
+# .env is read from WorkingDirectory
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+# Hardening (optional)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/home/pi/lvirify/packages/hub/data
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,25 @@
+{
+  "name": "@lvirify/hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "lvirify hub: presence server + cassette wall, runs on the office Raspberry Pi.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@lvirify/clients": "0.1.0",
+    "@lvirify/shared": "0.1.0",
+    "hono": "^4.6.14",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
