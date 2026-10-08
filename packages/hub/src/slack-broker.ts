@@ -19,6 +19,7 @@ interface SlackConfig {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
+  teamId: string | null;
 }
 
 /**
@@ -72,6 +73,10 @@ export class SlackBroker {
     }
     try {
       const token = await exchangeCode({ ...this.config, code });
+      if (this.config.teamId && token.teamId !== this.config.teamId) {
+        session.result = { status: 'error', message: `wrong Slack workspace (${token.teamName}); only the office workspace is allowed` };
+        return { owner: session.owner, ok: false, message: session.result.message };
+      }
       session.result = { status: 'done', ...token };
       if (session.owner.kind === 'member') this.sessions.delete(state); // token is stored elsewhere; nothing to poll
       return { owner: session.owner, ok: true, message: 'ok', token };

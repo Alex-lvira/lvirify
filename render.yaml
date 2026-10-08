@@ -21,5 +21,9 @@ services:
         sync: false
       - key: SLACK_CLIENT_SECRET
         sync: false
+      - key: SLACK_TEAM_ID
+        sync: false
+      - key: ACCESS_PASSWORD
+        sync: false
       # PUBLIC_URL is taken from RENDER_EXTERNAL_URL automatically.
       # KEEPALIVE defaults to on when running on Render.

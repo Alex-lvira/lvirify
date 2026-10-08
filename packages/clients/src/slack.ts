@@ -72,7 +72,7 @@ export async function exchangeCode(opts: {
   clientSecret: string;
   code: string;
   redirectUri: string;
-}): Promise<{ token: string; slackUserId: string; teamName: string }> {
+}): Promise<{ token: string; slackUserId: string; teamName: string; teamId: string }> {
   const body = new URLSearchParams({
     client_id: opts.clientId,
     client_secret: opts.clientSecret,
@@ -88,7 +88,7 @@ export async function exchangeCode(opts: {
   const json = (await res.json().catch(() => ({ ok: false }))) as {
     ok: boolean;
     error?: string;
-    team?: { name?: string };
+    team?: { name?: string; id?: string };
     authed_user?: { id?: string; access_token?: string };
   };
   if (!json.ok || !json.authed_user?.access_token) throw new SlackError(json.error ?? 'oauth.v2.access failed');
@@ -96,6 +96,7 @@ export async function exchangeCode(opts: {
     token: json.authed_user.access_token,
     slackUserId: json.authed_user.id ?? '',
     teamName: json.team?.name ?? 'Slack',
+    teamId: json.team?.id ?? '',
   };
 }
 

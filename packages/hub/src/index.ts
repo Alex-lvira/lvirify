@@ -12,7 +12,7 @@ import { env } from './env.js';
 import { Store } from './store.js';
 import { SlackBroker } from './slack-broker.js';
 import { Members } from './members.js';
-import { joinPage, mePage, messagePage } from './pages.js';
+import { joinPage, loginPage, mePage, messagePage } from './pages.js';
 
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), '[hub]', ...args);
 
@@ -98,23 +98,75 @@ function setMemberCookie(c: Context, userId: string) {
   });
 }
 
-/* Optional wall password: DASHBOARD_KEY=... makes the wall itself private. */
-const WALL_COOKIE = 'lv_wall';
-function wallAllowed(c: Context): boolean {
-  if (!env.dashboardKey) return true;
-  const key = c.req.query('key');
-  if (key && safeEqual(key, env.dashboardKey)) {
-    setCookie(c, WALL_COOKIE, sign(`wall:${env.dashboardKey}`), { httpOnly: true, sameSite: 'Lax', secure: env.isHttps, path: '/', maxAge: 365 * 24 * 3600 });
-    return true;
+/* ---- Site password (ACCESS_PASSWORD) ---- */
+const ACCESS_COOKIE = 'lv_access';
+/** Changing the password invalidates every existing cookie. */
+const accessToken = () => crypto.createHmac('sha256', env.hubSecret).update(`access:${env.accessPassword}`).digest('base64url');
+
+function hasAccessCookie(cookieHeader: string | undefined): boolean {
+  if (!env.accessPassword) return true;
+  const m = /(?:^|;\s*)lv_access=([^;]+)/.exec(cookieHeader ?? '');
+  return !!m && safeEqual(decodeURIComponent(m[1]!), accessToken());
+}
+function siteAllowed(c: Context): boolean {
+  return hasAccessCookie(c.req.header('cookie'));
+}
+
+/* Brute-force limiter for /login: 5 attempts per IP per minute. */
+const attempts = new Map<string, { count: number; resetAt: number }>();
+function clientIp(c: Context): string {
+  return (c.req.header('x-forwarded-for')?.split(',')[0] ?? '').trim() || 'local';
+}
+function tooManyAttempts(ip: string): boolean {
+  const now = Date.now();
+  const a = attempts.get(ip);
+  if (!a || a.resetAt < now) {
+    attempts.set(ip, { count: 1, resetAt: now + 60_000 });
+    return false;
   }
-  const cookie = getCookie(c, WALL_COOKIE);
-  return !!cookie && safeEqual(cookie, sign(`wall:${env.dashboardKey}`));
+  a.count++;
+  return a.count > 5;
 }
-function wallAllowedRaw(req: IncomingMessage): boolean {
-  if (!env.dashboardKey) return true;
-  const m = /(?:^|;\s*)lv_wall=([^;]+)/.exec(req.headers.cookie ?? '');
-  return !!m && safeEqual(decodeURIComponent(m[1]!), sign(`wall:${env.dashboardKey}`));
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, a] of attempts) if (a.resetAt < now) attempts.delete(ip);
+}, 60_000).unref();
+
+/** Paths that work without the site password: health, OAuth callbacks, companion API, assets. */
+const OPEN_PATHS = [/^\/healthz$/, /^\/login$/, /^\/api\/public-config$/, /^\/api\/slack\/session\//, /^\/slack\/(connect|callback)$/, /^\/spotify\/callback$/, /^\/assets\//, /^\/favicon\.svg$/];
+
+app.use('*', async (c, next) => {
+  if (!env.accessPassword) return next();
+  const path = new URL(c.req.url).pathname;
+  if (OPEN_PATHS.some((re) => re.test(path)) || siteAllowed(c)) return next();
+  if (c.req.method !== 'GET' || path.startsWith('/api/')) return c.text('unauthorized', 401);
+  return c.redirect('/login?next=' + encodeURIComponent(path));
+});
+
+function safeNext(raw: string | undefined): string {
+  return raw && /^\/[^/\\]/.test(raw) ? raw : '/';
 }
+
+app.get('/login', (c) => {
+  if (!env.accessPassword) return c.redirect('/');
+  return c.html(loginPage({ hubName: env.hubName, next: safeNext(c.req.query('next')) }));
+});
+
+app.post('/login', async (c) => {
+  if (!env.accessPassword) return c.redirect('/');
+  const ip = clientIp(c);
+  const form = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
+  const next = safeNext(typeof form.next === 'string' ? form.next : undefined);
+  if (tooManyAttempts(ip)) return c.html(loginPage({ hubName: env.hubName, next, error: 'Too many attempts. Wait a minute.' }), 429);
+  const password = typeof form.password === 'string' ? form.password : '';
+  if (!safeEqual(password, env.accessPassword)) {
+    log(`failed login from ${ip}`);
+    return c.html(loginPage({ hubName: env.hubName, next, error: 'Wrong password.' }), 401);
+  }
+  setCookie(c, ACCESS_COOKIE, accessToken(), { httpOnly: true, sameSite: 'Lax', secure: env.isHttps, path: '/', maxAge: 365 * 24 * 3600 });
+  attempts.delete(ip);
+  return c.redirect(next);
+});
 
 /* ------------------------------------------------------------------ */
 /* HTTP API                                                            */
@@ -127,10 +179,7 @@ app.get('/api/public-config', (c) => {
   return c.json(body);
 });
 
-app.get('/api/state', (c) => {
-  if (!wallAllowed(c)) return c.text('unauthorized', 401);
-  return c.json({ hubName: env.hubName, users: store.snapshot() });
-});
+app.get('/api/state', (c) => c.json({ hubName: env.hubName, users: store.snapshot() }));
 
 /* ---- Slack broker (companions + members) ---- */
 
@@ -341,7 +390,6 @@ app.get('*', (c) => {
   if (!rel || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     if (isAsset) return c.text('not found', 404);
     // SPA fallback: "/" and "/kiosk" both render the dashboard.
-    if (!wallAllowed(c)) return c.html(messagePage({ hubName: env.hubName, ok: false, title: 'Private wall', message: 'This wall needs a key. Ask whoever runs the hub for the link with ?key=…' }), 401);
     file = path.join(dir, 'index.html');
     if (!fs.existsSync(file)) return c.text('Dashboard not built. Run `npm run build`.', 503);
   }
@@ -361,7 +409,8 @@ const server = serve({ fetch: app.fetch, port: env.port, hostname: '0.0.0.0' }, 
   log(`dashboard dir: ${env.dashboardDir}${fs.existsSync(env.dashboardDir) ? '' : '  (missing, build it)'}`);
   log(`slack broker: ${slack ? 'enabled' : 'disabled (no SLACK_CLIENT_ID/SECRET)'}`);
   log(`join from site: ${env.webJoin ? (env.spotifyClientId ? 'enabled' : 'enabled but no SPOTIFY_CLIENT_ID') : 'off'}`);
-  log(`wall: ${env.dashboardKey ? 'private (DASHBOARD_KEY set)' : 'open to anyone with the URL'}`);
+  log(`site: ${env.accessPassword ? 'password protected' : 'OPEN to anyone with the URL (set ACCESS_PASSWORD)'}`);
+  if (env.slack) log(`slack workspace: ${env.slack.teamId ? `pinned to ${env.slack.teamId}` : 'any workspace the app can be installed in (set SLACK_TEAM_ID to pin)'}`);
   members.start();
   if (env.keepalive) {
     log('keepalive: on');
@@ -392,7 +441,7 @@ store.subscribe((event) => broadcast(event));
 server.on('upgrade', (req: IncomingMessage, socket, head) => {
   const url = new URL(req.url ?? '/', 'http://x');
   if (url.pathname === '/ws/dashboard') {
-    if (!wallAllowedRaw(req)) {
+    if (!hasAccessCookie(req.headers.cookie)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;

@@ -36,7 +36,7 @@ const STYLE = `
   .toggle span::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:.15s}
   .toggle input:checked+span{background:rgba(242,181,71,.25);border-color:var(--accent)}
   .toggle input:checked+span::after{transform:translateX(18px);background:var(--accent)}
-  input[type=text]{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:9px 11px;font:inherit;font-family:var(--mono);font-size:13px;width:160px}
+  input[type=text],input[type=password]{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:9px 11px;font:inherit;font-family:var(--mono);font-size:13px;width:160px}
   .now{display:flex;gap:14px;align-items:center}.now img{width:56px;height:56px;border-radius:8px;object-fit:cover}
   .err{color:var(--bad);font-size:13px}
   ol{padding-left:20px;margin:0}ol li{margin-bottom:6px}
@@ -183,4 +183,18 @@ export function messagePage(opts: { hubName: string; ok: boolean; title: string;
   ${opts.link ? `<a class="btn" href="${escapeHtml(opts.link.href)}">${escapeHtml(opts.link.label)}</a>` : ''}
 </section>`;
   return layout({ title: opts.ok ? 'done' : 'problem', hubName: opts.hubName, body });
+}
+
+export function loginPage(opts: { hubName: string; error?: string; next: string }): string {
+  const body = `<section>
+  <h2>Password</h2>
+  <p class="muted">This wall is private. Ask whoever runs it for the password.</p>
+  ${opts.error ? `<p class="err">${escapeHtml(opts.error)}</p>` : ''}
+  <form method="post" action="/login" class="row">
+    <input type="hidden" name="next" value="${escapeHtml(opts.next)}">
+    <input type="password" name="password" autofocus autocomplete="current-password" placeholder="password" style="width:220px">
+    <button type="submit">Enter</button>
+  </form>
+</section>`;
+  return layout({ title: 'sign in', hubName: opts.hubName, body });
 }

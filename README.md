@@ -68,6 +68,39 @@ Packages (TypeScript, Node 20+, npm workspaces):
   Clicking a cassette opens the track in Spotify. Up to four previous tracks
   are listed under each cassette and survive hub restarts.
 
+## Security model
+
+Who can do what, and why one person's music can never change someone else's
+status:
+
+- **Site password** (`ACCESS_PASSWORD`). Every page, including the wall,
+  `/join` and `/me`, asks for it once; the browser keeps a signed cookie.
+  Login is rate limited to 5 attempts per minute per IP, and changing the
+  password logs everyone out. Without it the site is open to anyone with the
+  URL, which the hub warns about at startup.
+- **Spotify gate.** A Spotify app in development mode only lets allowlisted
+  accounts authorize, so even with the password a stranger cannot complete
+  *Connect Spotify*. Add colleagues under *User Management* in the Spotify
+  dashboard; remove them there to lock them out.
+- **Slack gate.** The Slack app is not distributed, so Slack itself refuses
+  OAuth from other workspaces. `SLACK_TEAM_ID` pins the hub to your workspace
+  as a second check. *Connect Slack* is only reachable after a Spotify login.
+- **Per-person isolation.** A Slack status is written with the user token
+  that Slack issued to the person who clicked *Connect Slack* and logged in.
+  Slack's `users.profile.set` only changes the profile of the token's owner.
+  The hub keys everything on the Spotify user id behind a signed cookie, so
+  the only way to affect your status is to hold your Slack token, which lives
+  only on the hub (website members) or your machine (companion).
+- **Companion.** Publishes with `HUB_SECRET`. Its local settings page only
+  answers to the local browser and rejects cross-site requests.
+- **Leaving.** *Leave the wall* on `/me` deletes the person's tokens from the
+  hub and clears their Slack status.
+
+Limits to be aware of: everyone shares one site password, so there is no
+per-person revocation at the door (use the Spotify allowlist for that), and
+website members' tokens are stored on the hub, so the hub's disk and
+environment variables must be treated as secrets.
+
 ## One-time setup: the two apps
 
 ### Spotify developer app
@@ -135,9 +168,10 @@ free disk is wiped on every deploy, which means **members have to click
    the Slack app's redirect URL.
 6. Send colleagues `https://lvirify-xxxx.onrender.com/join`.
 
-Anyone with the URL can see the wall. To make it private set
-`DASHBOARD_KEY=<something>` in Render's environment and share
-`https://…/?key=<something>` instead; the browser remembers it in a cookie.
+Set `ACCESS_PASSWORD` in Render's environment (the Blueprint asks for it) and
+give colleagues that password together with the URL. Also set
+`SLACK_TEAM_ID` to your workspace id so only tokens from your workspace are
+ever accepted.
 
 ## Running everything on your own machine
 
@@ -259,14 +293,16 @@ once. Everything else is done from the settings page.
 | `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` | Slack app credentials; leave empty to disable Slack |
 | `DATA_DIR`          | where `state.json` and `members.json` live (default `./data`)           |
 | `WEB_JOIN`          | `0` disables joining from the site (companion only)                      |
-| `DASHBOARD_KEY`     | optional; when set the wall needs `?key=` once                           |
+| `ACCESS_PASSWORD`   | site password for every page; strongly recommended when hosted          |
+| `SLACK_TEAM_ID`     | optional; only accept Slack logins from this workspace                  |
 | `KEEPALIVE`         | self-ping every 10 min; defaults to on when running on Render           |
 
 ## HTTP / WebSocket surface
 
 | route                         | who         | auth   |
 | ----------------------------- | ----------- | ------ |
-| `GET /`, `GET /kiosk`         | browsers    | none, or `DASHBOARD_KEY` |
+| `GET /`, `GET /kiosk`         | browsers    | site password cookie |
+| `GET/POST /login`             | browsers    | none (rate limited) |
 | `GET /join`, `/spotify/login`, `/spotify/callback` | browsers | none (login flow) |
 | `GET /me`, `GET/POST /api/me*` | members    | signed cookie |
 | `GET /api/state`              | browsers    | none   |

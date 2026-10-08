@@ -49,6 +49,8 @@ export const env = {
           clientId: process.env.SLACK_CLIENT_ID,
           clientSecret: process.env.SLACK_CLIENT_SECRET,
           redirectUri: `${publicUrl}/slack/callback`,
+          /** Optional. Only tokens from this workspace (team id, e.g. T0123ABCD) are accepted. */
+          teamId: process.env.SLACK_TEAM_ID || null,
         }
       : null,
   dataDir: path.resolve(process.cwd(), process.env.DATA_DIR ?? './data'),
@@ -56,8 +58,11 @@ export const env = {
   dashboardDir: path.resolve(
     process.env.DASHBOARD_DIR ?? path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../dashboard/dist'),
   ),
-  /** Optional. When set, the wall needs ?key=<value> once (then a cookie). Join/settings pages are unaffected. */
-  dashboardKey: process.env.DASHBOARD_KEY || null,
+  /**
+   * Optional site password. When set, every page (wall, join, settings) needs a login
+   * first; the browser then keeps a signed cookie. Companions use HUB_SECRET instead.
+   */
+  accessPassword: process.env.ACCESS_PASSWORD || null,
   /**
    * Free hosts (Render) put the service to sleep after ~15 min without inbound HTTP.
    * When on, the hub fetches its own /healthz every 10 min. Default: on when running on Render.
