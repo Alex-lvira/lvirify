@@ -131,7 +131,8 @@ setTimeout(() => {
   PEOPLE.forEach(startCompanion);
   console.log(`
 [demo] wall:   http://localhost:${PORT}
-[demo] kiosk:  http://localhost:${PORT}/kiosk
+[demo] kiosk:  http://localhost:${PORT}/kiosk${process.env.ACCESS_PASSWORD ? `
+[demo] password: ${process.env.ACCESS_PASSWORD}` : ''}
 [demo] ${PEOPLE.length} fake colleagues connecting. Ctrl+C to stop.
 
 [demo] To add yourself for real, in another terminal:
